@@ -1,109 +1,150 @@
-pragma solidity >=0.4.21 <0.6.0;
+pragma solidity 0.6.6;
 
-contract Oracle {
-  Request[] requests; //list of requests made to the contract
-  uint currentId = 0; //increasing request id
-  uint minQuorum = 2; //minimum number of responses to receive before declaring final result
-  uint totalOracleCount = 3; // Hardcoded oracle count
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-  // defines a general api request
-  struct Request {
-    uint id;                            //request id
-    string urlToQuery;                  //API url
-    string attributeToFetch;            //json attribute (key) to retrieve in the response
-    string agreedValue;                 //value from key
-    mapping(uint => string) anwers;     //answers provided by the oracles
-    mapping(address => uint) quorum;    //oracles which will query the answer (1=oracle hasn't voted, 2=oracle has voted)
-  }
+contract Oracle is Ownable {
+    uint256 public constant MAX_REQUESTS_SIZE = 500;
 
-  //event that triggers oracle outside of the blockchain
-  event NewRequest (
-    uint id,
-    string urlToQuery,
-    string attributeToFetch
-  );
+    uint256 public currentId = 0; //increasing request id
+    uint256 public minQuorum = 1; //minimum number of responses to receive before declaring final result
 
-  //triggered when there's a consensus on the final result
-  event UpdatedRequest (
-    uint id,
-    string urlToQuery,
-    string attributeToFetch,
-    string agreedValue
-  );
+    Request[] public requests; //list of requests made to the contract
+    address[] public oracles;
 
-  function createRequest (
-    string memory _urlToQuery,
-    string memory _attributeToFetch
-  )
-  public
-  {
-    uint lenght = requests.push(Request(currentId, _urlToQuery, _attributeToFetch, ""));
-    Request storage r = requests[lenght-1];
+    mapping(address => bool) public isOracle;
+    mapping(string => mapping(string => string)) public currentResult;
 
-    // Hardcoded oracles address
-    r.quorum[address(0x6c2339b46F41a06f09CA0051ddAD54D1e582bA77)] = 1;
-    r.quorum[address(0xb5346CF224c02186606e5f89EACC21eC25398077)] = 1;
-    r.quorum[address(0xa2997F1CA363D11a0a35bB1Ac0Ff7849bc13e914)] = 1;
+    // defines a general api request
+    struct Request {
+        uint256 id; //request id
+        string urlToQuery; //API url
+        string attributeToFetch; //json attribute (key) to retrieve in the response
+        string agreedValue; //value from key
+        mapping(uint256 => string) anwers; //answers provided by the oracles
+        mapping(address => bool) quorum; //oracles which will query the answer (1=oracle hasn't voted, 2=oracle has voted)
+    }
 
-    // launch an event to be detected by oracle outside of blockchain
-    emit NewRequest (
-      currentId,
-      _urlToQuery,
-      _attributeToFetch
+    //event that triggers oracle outside of the blockchain
+    event NewRequest(uint256 id, string urlToQuery, string attributeToFetch);
+
+    //triggered when there's a consensus on the final result
+    event UpdatedRequest(
+        uint256 id,
+        string urlToQuery,
+        string attributeToFetch,
+        string agreedValue
     );
 
-    // increase request id
-    currentId++;
-  }
-
-  //called by the oracle to record its answer
-  function updateRequest (
-    uint _id,
-    string memory _valueRetrieved
-  ) public {
-
-    Request storage currRequest = requests[_id];
-
-    //check if oracle is in the list of trusted oracles
-    //and if the oracle hasn't voted yet
-    if(currRequest.quorum[address(msg.sender)] == 1){
-
-      //marking that this address has voted
-      currRequest.quorum[msg.sender] = 2;
-
-      //iterate through "array" of answers until a position if free and save the retrieved value
-      uint tmpI = 0;
-      bool found = false;
-      while(!found) {
-        //find first empty slot
-        if(bytes(currRequest.anwers[tmpI]).length == 0){
-          found = true;
-          currRequest.anwers[tmpI] = _valueRetrieved;
-        }
-        tmpI++;
-      }
-
-      uint currentQuorum = 0;
-
-      //iterate through oracle list and check if enough oracles(minimum quorum)
-      //have voted the same answer has the current one
-      for(uint i = 0; i < totalOracleCount; i++){
-        bytes memory a = bytes(currRequest.anwers[i]);
-        bytes memory b = bytes(_valueRetrieved);
-
-        if(keccak256(a) == keccak256(b)){
-          currentQuorum++;
-          if(currentQuorum >= minQuorum){
-            currRequest.agreedValue = _valueRetrieved;
-            emit UpdatedRequest (
-              currRequest.id,
-              currRequest.urlToQuery,
-              currRequest.attributeToFetch,
-              currRequest.agreedValue
-            );
-          }
-        }
-      }
+    function setMinQuorum(uint256 _minQuorum) external onlyOwner {
+        require(_minQuorum > 0);
+        minQuorum = _minQuorum;
     }
-  }
+
+    function addOracle(address _oracle) external onlyOwner {
+        require(_oracle != address(0) && !isOracle[_oracle]);
+        oracles.push(_oracle);
+        isOracle[_oracle] = true;
+    }
+
+    function removeOracle(address _oracle) external onlyOwner {
+        require(isOracle[_oracle]);
+        for (uint256 i = 0; i < oracles.length; i++) {
+            if (oracles[i] == _oracle) {
+                delete oracles[i];
+                break;
+            }
+        }
+        isOracle[_oracle] = false;
+    }
+
+    function totalOracleCount() external view returns (uint256) {
+        return oracles.length;
+    }
+
+    function getValue(
+        string calldata _urlToQuery,
+        string calldata _attributeToFetch
+    ) external view returns (string memory) {
+        return currentResult[_urlToQuery][_attributeToFetch];
+    }
+
+    function createRequest(
+        string memory _urlToQuery,
+        string memory _attributeToFetch
+    ) public {
+        if (currentId == requests.length) {
+            requests.push(
+                Request(currentId, _urlToQuery, _attributeToFetch, "")
+            );
+        } else {
+            requests[currentId] = Request(
+                currentId,
+                _urlToQuery,
+                _attributeToFetch,
+                ""
+            );
+        }
+
+        Request storage r = requests[currentId];
+
+        // oracles address
+        for (uint256 i = 0; i < oracles.length; i++) {
+            r.quorum[oracles[i]] = false;
+        }
+
+        // launch an event to be detected by oracle outside of blockchain
+        emit NewRequest(currentId, _urlToQuery, _attributeToFetch);
+
+        // increase request id
+        currentId = (currentId + 1) % MAX_REQUESTS_SIZE;
+    }
+
+    //called by the oracle to record its answer
+    function updateRequest(uint256 _id, string memory _valueRetrieved) public {
+        Request storage currRequest = requests[_id];
+
+        //check if oracle is in the list of trusted oracles
+        //and if the oracle hasn't voted yet
+        if (!currRequest.quorum[address(msg.sender)]) {
+            //marking that this address has voted
+            currRequest.quorum[msg.sender] = true;
+
+            //iterate through "array" of answers until a position if free and save the retrieved value
+            uint256 tmpI = 0;
+            bool found = false;
+            while (!found) {
+                //find first empty slot
+                if (bytes(currRequest.anwers[tmpI]).length == 0) {
+                    found = true;
+                    currRequest.anwers[tmpI] = _valueRetrieved;
+                }
+                tmpI++;
+            }
+
+            uint256 currentQuorum = 0;
+
+            //iterate through oracle list and check if enough oracles(minimum quorum)
+            //have voted the same answer has the current one
+            for (uint256 i = 0; i < oracles.length; i++) {
+                bytes memory a = bytes(currRequest.anwers[i]);
+                bytes memory b = bytes(_valueRetrieved);
+
+                if (keccak256(a) == keccak256(b)) {
+                    currentQuorum++;
+                    if (currentQuorum >= minQuorum) {
+                        currRequest.agreedValue = _valueRetrieved;
+                        currentResult[currRequest.urlToQuery][
+                            currRequest.attributeToFetch
+                        ] = _valueRetrieved;
+                        emit UpdatedRequest(
+                            currRequest.id,
+                            currRequest.urlToQuery,
+                            currRequest.attributeToFetch,
+                            currRequest.agreedValue
+                        );
+                    }
+                }
+            }
+        }
+    }
 }
