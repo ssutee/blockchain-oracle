@@ -5,21 +5,20 @@ import {
 } from "./ethereum";
 
 
-const start = () => {
-
-  let urlToQuery = 'https://pedrocosta.eu/shameless-promotion';
-  let attributeToFetch = 'Website';
-
-  createRequest({
-      urlToQuery,
-      attributeToFetch
-    })
-    .then(restart)
-    .catch(error);
+const start = async () => {
+  let urlToQuery = process.env.URL_TO_QUERY;
+  let attributeToFetch = process.env.ATTRIBUTE_TO_FETCH;
+  try {
+    await createRequest({urlToQuery, attributeToFetch});
+    restart();
+  } catch(err) {
+    error(err);
+  }
 };
 
-const restart = () => {
-  wait(process.env.TIMEOUT).then(start);
+const restart = async() => {
+  await wait(process.env.TIMEOUT);
+  start();
 };
 
 const wait = (milliseconds) => {

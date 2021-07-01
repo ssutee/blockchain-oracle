@@ -1,6 +1,6 @@
 require("dotenv").config();
 
-import request from "request-promise-native";
+const axios = require('axios');
 
 import {
   updateRequest,
@@ -8,27 +8,27 @@ import {
 } from "./ethereum";
 
 const start = () => {
-
   newRequest((error, result) => {
-
-    let options = {
-      uri: result.args.urlToQuery,
-      json: true
-    };
-
-    request(options)
+    axios.get(result.args.urlToQuery)    
       .then(parseData(result))
       .then(updateRequest)
       .catch(error);
   });
 };
 
-const parseData = result => (body) => {
+const resolvePath = (path, obj) => {
+    return path.split('.').reduce(function(prev, curr) {
+        return prev ? prev[curr] : null
+    }, obj || self)
+};
+
+const parseData = result => (res) => {
   return new Promise((resolve, reject) => {
     let id, valueRetrieved;
     try {
       id = result.args.id;
-      valueRetrieved = (body[result.args.attributeToFetch] || 0).toString();
+      valueRetrieved = result.args.attributeToFetch == "" ? res.data :         
+        (resolvePath(result.args.attributeToFetch, res.data) || 0).toString();
     } catch (error) {
       reject(error);
       return;

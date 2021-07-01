@@ -1,12 +1,13 @@
 require("dotenv").config();
 
 import Web3 from "web3";
-
-
-const web3 = new Web3(new Web3.providers.HttpProvider(process.env.WEB3_PROVIDER_ADDRESS));
+const HDWalletProvider = require('truffle-hdwallet-provider');
+const provider = new HDWalletProvider(process.env.MNEMONIC, process.env.RPC_URL, 0, 9);
+const web3 = new Web3(provider);
 const abi = JSON.parse(process.env.ABI);
 const address = process.env.CONTRACT_ADDRESS;
 const contract = web3.eth.contract(abi).at(address);
+const chainId = process.env.CHAIN_ID;
 
 const account = () => {
   return new Promise((resolve, reject) => {
@@ -20,15 +21,15 @@ const account = () => {
   });
 };
 
-export const createRequest = ({
+export const createRequest = async ({
   urlToQuery,
   attributeToFetch
-}) => {
+}) => {    
   return new Promise((resolve, reject) => {
     account().then(account => {
       contract.createRequest(urlToQuery, attributeToFetch, {
         from: account,
-        gas: 60000000
+        chainId: chainId
       }, (err, res) => {
         if (err === null) {
           resolve(res);
@@ -48,7 +49,7 @@ export const updateRequest = ({
     account().then(account => {
       contract.updateRequest(id, valueRetrieved, {
         from: account,
-        gas: 60000000
+        chainId: chainId
       }, (err, res) => {
         if (err === null) {
           resolve(res);
