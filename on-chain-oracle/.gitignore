@@ -61,5 +61,7 @@ typings/
 # dotenv environment variables file
 .env
 
+cache/
+artifacts/
 
 # End of https://www.gitignore.io/api/node
