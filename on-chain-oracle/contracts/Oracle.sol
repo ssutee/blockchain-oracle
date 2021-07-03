@@ -3,7 +3,7 @@ pragma solidity 0.6.6;
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 contract Oracle is Ownable {
-    uint256 public constant MAX_REQUESTS_SIZE = 500;
+    uint256 public maxRequests = 500;
 
     uint256 public currentId = 0; //increasing request id
     uint256 public minQuorum = 1; //minimum number of responses to receive before declaring final result
@@ -34,6 +34,11 @@ contract Oracle is Ownable {
         string attributeToFetch,
         string agreedValue
     );
+
+    function setMaxRequests(uint256 _maxRequests) external onlyOwner {
+        require(_maxRequests > 0);
+        maxRequests = _maxRequests;
+    }
 
     function setMinQuorum(uint256 _minQuorum) external onlyOwner {
         require(_minQuorum > 0);
@@ -96,7 +101,7 @@ contract Oracle is Ownable {
         emit NewRequest(currentId, _urlToQuery, _attributeToFetch);
 
         // increase request id
-        currentId = (currentId + 1) % MAX_REQUESTS_SIZE;
+        currentId = (currentId + 1) % maxRequests;
     }
 
     //called by the oracle to record its answer
