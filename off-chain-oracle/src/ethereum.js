@@ -21,7 +21,7 @@ const account = () => {
   });
 };
 
-export const createRequest = async ({
+export const createRequest = ({
   urlToQuery,
   attributeToFetch
 }) => {    
@@ -29,6 +29,7 @@ export const createRequest = async ({
     account().then(account => {
       contract.createRequest(urlToQuery, attributeToFetch, {
         from: account,
+        gas: '0x30d40', // 200,000 wei
         chainId: chainId
       }, (err, res) => {
         if (err === null) {
@@ -47,8 +48,9 @@ export const updateRequest = ({
 }) => {
   return new Promise((resolve, reject) => {
     account().then(account => {
-      contract.updateRequest(id, valueRetrieved, {
+      contract.updateRequest(id, valueRetrieved, {        
         from: account,
+        gas: '0x30d40', // 200,000 wei
         chainId: chainId
       }, (err, res) => {
         if (err === null) {
