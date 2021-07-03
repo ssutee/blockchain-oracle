@@ -10,3 +10,4 @@ services:
     environment:
       - URL_TO_QUERY=${URL_TO_QUERY}
       - ATTRIBUTE_TO_FETCH=${ATTRIBUTE_TO_FETCH}
+      - ACCOUNT_NUMBER=${ACCOUNT_NUMBER}
