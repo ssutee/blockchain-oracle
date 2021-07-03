@@ -10,7 +10,7 @@ const start = async () => {
   let attributeToFetch = process.env.ATTRIBUTE_TO_FETCH;
   try {
     await createRequest({urlToQuery, attributeToFetch});
-    restart();
+    restart().catch(() => {});
   } catch(err) {
     error(err);
   }
@@ -18,7 +18,7 @@ const start = async () => {
 
 const restart = async() => {
   await wait(process.env.TIMEOUT);
-  start();
+  start().catch(() => {});
 };
 
 const wait = (milliseconds) => {
@@ -27,7 +27,7 @@ const wait = (milliseconds) => {
 
 const error = (error) => {
   console.error(error);
-  restart();
+  restart().catch(() => {});
 };
 
 export default start;
